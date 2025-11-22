@@ -3,14 +3,20 @@ package server.handlers;
 
 import server.HttpRequest;
 import server.HttpResponses;
+import server.logic.ContestService;
 import server.time.ConfigService;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Instant;
-import java.util.UUID;
 
 public class PostHandler implements Handler {
+
+    private final ContestService contest;
+
+    public PostHandler() throws IOException {
+        this.contest = new ContestService();
+    }
 
     @Override
     public void handle(HttpRequest req, OutputStream out) throws IOException {
@@ -61,13 +67,11 @@ public class PostHandler implements Handler {
             return;
         }
 
-        // 6) (Пока без БД) — сгенерим временный submissionId и вернём 201
-        String submissionId = UUID.randomUUID().toString();
-        String safeTitle = title.replace("\"","\\\"").replace("\n"," ").replace("\r"," ");
-
+        // 6) Сохраняем текстовую версию и фиксируем регистрацию
+        var submission = contest.registerTextSubmission(clientId, title, text);
         String json = """
             {"status":"accepted","submissionId":"%s","title":"%s","receivedAt":"%s"}
-            """.formatted(submissionId, safeTitle, Instant.now());
+            """.formatted(submission.submissionId(), escape(submission.title()), Instant.ofEpochMilli(submission.receivedAtUtc()));
 
         HttpResponses.json(out, 201, json);
     }
@@ -84,5 +88,9 @@ public class PostHandler implements Handler {
         int q2 = json.indexOf('"', q1 + 1);
         if (q2 < 0) return null;
         return json.substring(q1 + 1, q2);
+    }
+
+    private static String escape(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ");
     }
 }

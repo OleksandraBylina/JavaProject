@@ -19,6 +19,7 @@ public final class ConfigService {
 
     public static int minChars() { return 2000; }
     public static int maxChars() { return 30000; }
+    public static int requiredReviewsPerClient() { return 3; }
 
     public static boolean isSubmitOpenNow() {
         var now = Instant.now();

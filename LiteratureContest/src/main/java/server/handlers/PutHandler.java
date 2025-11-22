@@ -2,6 +2,7 @@ package server.handlers;
 
 import server.HttpRequest;
 import server.HttpResponses;
+import server.logic.ContestService;
 import server.time.ConfigService;
 
 import java.io.IOException;
@@ -24,6 +25,11 @@ import java.util.List;
 public class PutHandler implements Handler {
 
     private final Path base = Paths.get("storage");
+    private final ContestService contest;
+
+    public PutHandler() throws IOException {
+        this.contest = new ContestService();
+    }
 
     @Override
     public void handle(HttpRequest req, OutputStream out) throws IOException {
@@ -76,15 +82,14 @@ public class PutHandler implements Handler {
             return;
         }
 
-        // Сохраняем как storage/submissions/<clientId>/story.ext (перезапись разрешена)
-        Path dir  = base.resolve("submissions").resolve(safe(clientId));
-        Files.createDirectories(dir);
-        Path file = dir.resolve("story" + ext);
-        Files.write(file, body);
+        String title = header(req, "x-story-title");
+        if (title == null || title.isBlank()) title = "Untitled";
+
+        var submission = contest.registerBinarySubmission(clientId, title, ext, body);
 
         HttpResponses.json(out, 201,
                 ("{\"status\":\"replaced\",\"clientId\":\"%s\",\"file\":\"%s\"}")
-                        .formatted(escape(clientId), file.getFileName()));
+                        .formatted(escape(clientId), submission.fileName()));
     }
 
     /* =================== PUT /reviews =================== */
@@ -119,6 +124,7 @@ public class PutHandler implements Handler {
 
         List<String> normalized = new ArrayList<>();
         List<String> errors = new ArrayList<>();
+        List<ContestService.Review> reviewEntries = new ArrayList<>();
 
         int lineNo = 0;
         for (String line : csv.split("\\R")) {
@@ -150,13 +156,18 @@ public class PutHandler implements Handler {
                 continue;
             }
             normalized.add(storyId + "," + score);
+            reviewEntries.add(new ContestService.Review(clientId, storyId, score, java.time.Instant.now().toEpochMilli()));
         }
 
         // Сохраняем как storage/reviews/<clientId>.csv (перезапись)
+        // сначала сохраняем исходный CSV
         Path dir = base.resolve("reviews");
         Files.createDirectories(dir);
         Path file = dir.resolve(safe(clientId) + ".csv");
         Files.writeString(file, String.join("\n", normalized) + (normalized.isEmpty() ? "" : "\n"));
+
+        var result = contest.acceptReviews(clientId, reviewEntries);
+        errors.addAll(result.errors());
 
         String json = """
         {
@@ -168,12 +179,12 @@ public class PutHandler implements Handler {
         }
         """.formatted(
                 escape(clientId),
-                normalized.size(),
+                result.saved(),
                 errors.size(),
                 toJsonArraySample(errors, 5)
         );
 
-        HttpResponses.json(out, 201, json);
+        HttpResponses.json(out, errors.isEmpty() ? 201 : 422, json);
     }
 
     /* =================== helpers =================== */
