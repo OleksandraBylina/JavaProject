@@ -8,14 +8,16 @@ public final class ConfigService {
 
     public static String timezone() { return "Europe/Kyiv"; }
 
-    public static Instant submitFrom() { return Instant.parse("2025-11-01T00:00:00Z"); }
-    public static Instant submitTo()   { return Instant.parse("2025-11-10T23:59:59Z"); }
+    public static Instant submitFrom() { return Instant.parse("2025-11-20T00:00:00Z"); }
+    public static Instant submitTo()   { return Instant.parse("2025-12-05T23:59:59Z"); }
 
-    // <<< заменили даты окна рецензирования для теста сейчас >>>
-    public static Instant reviewFrom() { return Instant.parse("2025-10-01T00:00:00Z"); }
-    public static Instant reviewTo()   { return Instant.parse("2025-12-31T23:59:59Z"); }
 
-    public static Instant resultsAt()  { return Instant.parse("2025-11-22T12:00:00Z"); }
+    public static Instant reviewFrom() { return Instant.parse("2025-11-24T00:00:00Z"); }
+    public static Instant reviewTo()   { return Instant.parse("2025-12-10T23:59:59Z"); }
+
+    public static Instant resultsAt()  { return Instant.parse("2025-12-25T12:00:00Z"); }
+
+    public static String expectedMailSubject() { return "Literature Contest"; }
 
     public static int minChars() { return 2000; }
     public static int maxChars() { return 30000; }

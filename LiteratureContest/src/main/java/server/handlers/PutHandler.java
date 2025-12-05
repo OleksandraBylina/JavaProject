@@ -3,6 +3,7 @@ package server.handlers;
 import server.HttpRequest;
 import server.HttpResponses;
 import server.logic.ContestService;
+import server.format.DocxUtil;
 import server.time.ConfigService;
 
 import java.io.IOException;
@@ -73,12 +74,28 @@ public class PutHandler implements Handler {
         ct = ct.toLowerCase();
 
         String ext;
+        String text;
         if (ct.startsWith("text/plain")) {
             ext = ".txt";
+            text = new String(body, java.nio.charset.StandardCharsets.UTF_8);
         } else if (ct.startsWith("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
             ext = ".docx";
+            try {
+                text = DocxUtil.extractPlainText(body);
+            } catch (Exception e) {
+                HttpResponses.json(out, 422, "{\"error\":\"cannot read docx text\"}");
+                return;
+            }
         } else {
             HttpResponses.json(out, 415, "{\"error\":\"Content-Type must be text/plain or docx\"}");
+            return;
+        }
+
+        int chars = text.codePointCount(0, text.length());
+        int min = ConfigService.minChars();
+        int max = ConfigService.maxChars();
+        if (chars <= min || chars >= max) {
+            HttpResponses.json(out, 422, ("{\"error\":\"length must be between %d and %d, got %d\"}").formatted(min, max, chars));
             return;
         }
 
@@ -109,7 +126,6 @@ public class PutHandler implements Handler {
             return;
         }
 
-
         String ct = header(req, "content-type");
         if (ct == null || !ct.toLowerCase().startsWith("text/csv")) {
             HttpResponses.json(out, 415, "{\"error\":\"Content-Type must be text/csv\"}");
@@ -125,6 +141,10 @@ public class PutHandler implements Handler {
         List<String> normalized = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         List<ContestService.Review> reviewEntries = new ArrayList<>();
+        var myStories = contest.loadSubmissions().stream()
+                .filter(s -> s.clientId().equalsIgnoreCase(clientId))
+                .map(ContestService.Submission::submissionId)
+                .collect(java.util.stream.Collectors.toSet());
 
         int lineNo = 0;
         for (String line : csv.split("\\R")) {
@@ -150,8 +170,8 @@ public class PutHandler implements Handler {
                 errors.add("line " + lineNo + ": score out of range 1..10");
                 continue;
             }
-            // Простейшая защита от самооценки: если storyId совпадает с clientId
-            if (storyId.equalsIgnoreCase(clientId)) {
+            // Простейшая защита от самооценки: если story принадлежит тому же клиенту
+            if (myStories.contains(storyId)) {
                 errors.add("line " + lineNo + ": self-review is not allowed");
                 continue;
             }
@@ -206,11 +226,11 @@ public class PutHandler implements Handler {
         int n = Math.min(max, list.size());
         for (int i = 0; i < n; i++) {
             if (i > 0) sb.append(',');
-            sb.append('"').append(escape(list.get(i))).append('"');
+            sb.append('\"').append(escape(list.get(i))).append('\"');
         }
         if (list.size() > max) {
             if (n > 0) sb.append(',');
-            sb.append('"').append("... +" + (list.size() - max) + " more").append('"');
+            sb.append('\"').append("... +" + (list.size() - max) + " more").append('\"');
         }
         sb.append(']');
         return sb.toString();

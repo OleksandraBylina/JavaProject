@@ -17,11 +17,19 @@ public class HttpServer {
 
     public static void main(String[] args) throws Exception {
         Storage.ensure();
+        var getHandler  = new GetHandler();
+        var postHandler = new PostHandler();
+        var putHandler  = new PutHandler();
         var router = new Router()
-                .registerGET("/status", new GetHandler())
-                .registerPOST("/submit", new PostHandler())// <-- добавили
-                .registerPUT("/submission", new PutHandler())
-                .registerPUT("/reviews",    new PutHandler());
+                .registerGET("/status", getHandler)
+                .registerGET("/assignments", getHandler)
+                .registerGET("/assignments.xlsx", getHandler)
+                .registerGET("/assignments.zip", getHandler)
+                .registerGET("/results", getHandler)
+                .registerPOST("/submit", postHandler)
+                .registerPOST("/mail", postHandler)
+                .registerPUT("/submission", putHandler)
+                .registerPUT("/reviews",    putHandler);
 
         var queue = new ArrayBlockingQueue<Runnable>(200);
         var pool = new ThreadPoolExecutor(32, 64, 60, TimeUnit.SECONDS, queue,
